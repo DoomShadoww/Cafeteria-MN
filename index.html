@@ -1,0 +1,1935 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cafetería Escolar — Pedidos y Administración</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    /* Ocultar barra de scroll horizontal en filtros manteniendo desplazamiento táctil */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-fade-up {
+      animation: fadeSlideUp 0.25s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-900 antialiased selection:bg-emerald-100 selection:text-emerald-900">
+
+  <!-- ===================================================================== -->
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR                                          -->
+  <!-- ===================================================================== -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between gap-3">
+      <!-- Identidad de la Cafetería -->
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-sm shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+          </svg>
+        </div>
+        <div class="truncate">
+          <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-slate-900 truncate">
+            Cafetería Escolar
+          </h1>
+          <p class="text-xs text-slate-500 hidden sm:block">
+            Lonchería saludable y pedidos para el recreo
+          </p>
+        </div>
+      </div>
+
+      <!-- Selector de Vista: Alumnos vs Administrador -->
+      <nav class="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200/80 shrink-0" aria-label="Selector de modo">
+        <button
+          id="nav-student-btn"
+          type="button"
+          onclick="window.switchMainView('student')"
+          class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all bg-white text-emerald-700 shadow-xs flex items-center gap-1.5"
+        >
+          <span>🍽️</span>
+          <span>Menú y Pedidos</span>
+        </button>
+
+        <button
+          id="nav-admin-btn"
+          type="button"
+          onclick="window.requestAdminAccess()"
+          class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5 relative"
+        >
+          <span id="admin-lock-icon">🔒</span>
+          <span class="hidden xs:inline sm:inline">Panel Admin</span>
+          <span class="sm:hidden">Admin</span>
+          <span
+            id="header-pending-badge"
+            class="hidden ml-0.5 px-1.5 py-0.5 text-[11px] font-extrabold rounded-full bg-amber-500 text-white leading-none"
+          >0</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- NOTIFICACIÓN FLOTANTE (TOAST)                                         -->
+  <!-- ===================================================================== -->
+  <div
+    id="toast-container"
+    class="fixed top-20 right-4 z-50 flex flex-col gap-2 max-w-sm w-[calc(100%-2rem)] pointer-events-none"
+  ></div>
+
+  <!-- ===================================================================== -->
+  <!-- CONTENIDO PRINCIPAL                                                   -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 lg:pb-10">
+
+    <!-- =================================================================== -->
+    <!-- VISTA 1: ALUMNOS (MENÚ Y CARRITO DE COMPRAS)                        -->
+    <!-- =================================================================== -->
+    <section id="student-view" class="space-y-6">
+      <!-- Banner de Bienvenida -->
+      <div class="rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 p-5 sm:p-7 text-white shadow-md relative overflow-hidden">
+        <div class="relative z-10 max-w-2xl space-y-2">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-xs font-semibold">
+            ✨ Servicio rápido sin filas en el recreo
+          </span>
+          <h2 class="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight">
+            ¡Arma tu lonche favorito para hoy!
+          </h2>
+          <p class="text-xs sm:text-sm text-emerald-50 leading-relaxed">
+            Selecciona los alimentos y bebidas que deseas, anota tu nombre, grado y grupo, y confirma tu orden para que cocina la tenga lista.
+          </p>
+        </div>
+        <div class="hidden md:flex items-center justify-center absolute right-8 top-1/2 -translate-y-1/2 text-7xl opacity-25 select-none">
+          🥪🍎🧃
+        </div>
+      </div>
+
+      <!-- Layout Principal: Catálogo (Izquierda) + Carrito (Derecha) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- COLUMNA IZQUIERDA: BUSCADOR, CATEGORÍAS Y TARJETAS DE MENÚ -->
+        <div class="lg:col-span-8 space-y-5">
+          <!-- Barra de búsqueda y filtro por categoría -->
+          <div class="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3">
+            <div class="relative">
+              <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 pointer-events-none">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                id="menu-search-input"
+                type="text"
+                placeholder="Buscar molletes, fruta, tacos, agua fresca..."
+                oninput="window.handleMenuSearch(this.value)"
+                class="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+              <button
+                id="clear-search-btn"
+                type="button"
+                onclick="window.clearMenuSearch()"
+                class="hidden absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-700 px-1"
+                title="Limpiar búsqueda"
+              >
+                ✕
+              </button>
+            </div>
+
+            <!-- Botones de Categorías -->
+            <div id="category-pills" class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              <!-- Renderizado dinámico por JS -->
+            </div>
+          </div>
+
+          <!-- Grid de Platillos Disponibles -->
+          <div id="menu-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Renderizado dinámico por JS -->
+          </div>
+        </div>
+
+        <!-- COLUMNA DERECHA: CARRITO Y DATOS DEL ALUMNO -->
+        <aside id="cart-panel" class="lg:col-span-4 lg:sticky lg:top-22 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-5 bg-slate-900 text-white flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">🛒</span>
+              <div>
+                <h3 class="font-bold text-base leading-tight">Tu Pedido Actual</h3>
+                <p id="cart-subtitle" class="text-xs text-slate-300">0 productos seleccionados</p>
+              </div>
+            </div>
+            <button
+              id="clear-cart-btn"
+              type="button"
+              onclick="window.clearCart()"
+              class="hidden text-xs font-semibold text-rose-300 hover:text-rose-200 px-2.5 py-1.5 rounded-xl hover:bg-white/10 transition"
+            >
+              Vaciar
+            </button>
+          </div>
+
+          <div class="p-5 space-y-5">
+            <!-- Lista de Artículos en el Carrito -->
+            <div id="cart-items-container" class="space-y-3 max-h-64 overflow-y-auto pr-1">
+              <!-- Renderizado dinámico -->
+            </div>
+
+            <!-- Resumen de Total -->
+            <div class="border-t border-dashed border-slate-200 pt-4 space-y-1.5">
+              <div class="flex items-center justify-between text-xs text-slate-500">
+                <span>Artículos totales</span>
+                <span id="cart-total-count" class="font-semibold text-slate-700">0</span>
+              </div>
+              <div class="flex items-center justify-between text-base sm:text-lg font-extrabold text-slate-900">
+                <span>Total a Pagar</span>
+                <span id="cart-total-amount" class="text-emerald-600">$0.00</span>
+              </div>
+            </div>
+
+            <!-- Formulario del Alumno para Confirmar Orden -->
+            <form id="order-checkout-form" onsubmit="window.submitStudentOrder(event)" class="space-y-3.5 border-t border-slate-100 pt-4">
+              <p class="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Datos del Alumno
+              </p>
+
+              <div>
+                <label for="student-name" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Nombre completo del niño(a) *
+                </label>
+                <input
+                  id="student-name"
+                  type="text"
+                  required
+                  placeholder="Ej. Mateo González Ruiz"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label for="student-grade" class="block text-xs font-semibold text-slate-700 mb-1">
+                    Grado *
+                  </label>
+                  <select
+                    id="student-grade"
+                    required
+                    class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Elegir...</option>
+                    <option value="1° Primaria">1° Primaria</option>
+                    <option value="2° Primaria">2° Primaria</option>
+                    <option value="3° Primaria">3° Primaria</option>
+                    <option value="4° Primaria">4° Primaria</option>
+                    <option value="5° Primaria">5° Primaria</option>
+                    <option value="6° Primaria">6° Primaria</option>
+                    <option value="1° Secundaria">1° Secundaria</option>
+                    <option value="2° Secundaria">2° Secundaria</option>
+                    <option value="3° Secundaria">3° Secundaria</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="student-group" class="block text-xs font-semibold text-slate-700 mb-1">
+                    Grupo *
+                  </label>
+                  <select
+                    id="student-group"
+                    required
+                    class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Elegir...</option>
+                    <option value="Grupo A">Grupo A</option>
+                    <option value="Grupo B">Grupo B</option>
+                    <option value="Grupo C">Grupo C</option>
+                    <option value="Grupo D">Grupo D</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label for="student-recess" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Horario de entrega *
+                </label>
+                <select
+                  id="student-recess"
+                  required
+                  class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="10:00 AM (1er Recreo)">10:00 AM (1er Recreo)</option>
+                  <option value="11:00 AM (2do Recreo)">11:00 AM (2do Recreo)</option>
+                  <option value="12:30 PM (Horario Comida)">12:30 PM (Horario Comida)</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="student-notes" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Notas para cocina (opcional)
+                </label>
+                <input
+                  id="student-notes"
+                  type="text"
+                  placeholder="Ej. Sin cebolla, sin chile, alergia..."
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <button
+                id="confirm-order-btn"
+                type="submit"
+                class="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-sm shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>Confirmar Pedido</span>
+                <span id="confirm-btn-total">$0.00</span>
+              </button>
+            </form>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- VISTA 2: PANEL DE ADMINISTRADOR (PROTEGIDO POR CONTRASEÑA)          -->
+    <!-- =================================================================== -->
+    <section id="admin-view" class="hidden space-y-6 animate-fade-up">
+      <!-- Encabezado del Panel Admin -->
+      <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800">
+              Sesión Autorizada
+            </span>
+            <span id="sync-status-pill" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+              ● En vivo
+            </span>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">
+            Panel de Control — Cocina y Administración
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-500">
+            Revisa las órdenes entrantes de los alumnos, gestiona el menú y actualiza la contraseña.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onclick="window.logoutAdmin()"
+          class="self-start sm:self-center px-4 py-2.5 rounded-2xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs sm:text-sm font-bold transition flex items-center gap-2 shrink-0"
+        >
+          <span>🔒</span>
+          <span>Cerrar Sesión Admin</span>
+        </button>
+      </div>
+
+      <!-- Tarjetas de Resumen Rápido -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs">
+          <p class="text-xs font-semibold text-slate-500">Pendientes</p>
+          <p id="stat-pending" class="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1">0</p>
+        </div>
+        <div class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs">
+          <p class="text-xs font-semibold text-slate-500">En Preparación</p>
+          <p id="stat-preparing" class="text-2xl sm:text-3xl font-extrabold text-sky-600 mt-1">0</p>
+        </div>
+        <div class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs">
+          <p class="text-xs font-semibold text-slate-500">Entregados</p>
+          <p id="stat-delivered" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 mt-1">0</p>
+        </div>
+        <div class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs">
+          <p class="text-xs font-semibold text-slate-500">Ventas Totales</p>
+          <p id="stat-revenue" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">$0.00</p>
+        </div>
+      </div>
+
+      <!-- Sub-navegación del Panel Admin -->
+      <div class="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 w-full sm:w-fit">
+        <button
+          id="admin-subtab-orders"
+          type="button"
+          onclick="window.switchAdminSubtab('orders')"
+          class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition bg-sky-600 text-white shadow-xs"
+        >
+          📋 Bandeja de Pedidos
+        </button>
+        <button
+          id="admin-subtab-menu"
+          type="button"
+          onclick="window.switchAdminSubtab('menu')"
+          class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition text-slate-600 hover:text-slate-900"
+        >
+          ⚙️ Menú y Seguridad
+        </button>
+      </div>
+
+      <!-- SUB-SECCIÓN A: BANDEJA DE PEDIDOS -->
+      <div id="admin-orders-section" class="space-y-4">
+        <!-- Filtros de Estado y Buscador de Alumno -->
+        <div class="bg-white p-4 rounded-3xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div id="admin-status-filters" class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <button type="button" data-status="all" onclick="window.setAdminOrderFilter('all')" class="admin-filter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white shrink-0">
+              Todos
+            </button>
+            <button type="button" data-status="Pendiente" onclick="window.setAdminOrderFilter('Pendiente')" class="admin-filter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0">
+              ⏳ Pendientes
+            </button>
+            <button type="button" data-status="Preparando" onclick="window.setAdminOrderFilter('Preparando')" class="admin-filter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0">
+              👨‍🍳 Preparando
+            </button>
+            <button type="button" data-status="Entregado" onclick="window.setAdminOrderFilter('Entregado')" class="admin-filter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0">
+              ✅ Entregados
+            </button>
+          </div>
+
+          <input
+            id="admin-order-search"
+            type="text"
+            placeholder="Buscar por alumno, grado o folio..."
+            oninput="window.handleAdminOrderSearch(this.value)"
+            class="w-full md:w-72 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
+
+        <!-- Lista de Órdenes -->
+        <div id="admin-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Renderizado dinámico -->
+        </div>
+      </div>
+
+      <!-- SUB-SECCIÓN B: GESTIÓN DE MENÚ Y CONTRASEÑA -->
+      <div id="admin-menu-section" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Columna Izquierda: Agregar Platillo + Cambiar Contraseña -->
+        <div class="lg:col-span-5 space-y-6">
+          <!-- Formulario: Nuevo Platillo -->
+          <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+            <h3 class="text-base sm:text-lg font-extrabold text-slate-900">
+              ➕ Agregar Nuevo Platillo
+            </h3>
+            <form onsubmit="window.handleAddMenuItem(event)" class="space-y-3.5">
+              <div>
+                <label for="new-item-name" class="block text-xs font-semibold text-slate-700 mb-1">Nombre del platillo *</label>
+                <input id="new-item-name" type="text" required placeholder="Ej. Burrito de Frijol con Queso" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="new-item-category" class="block text-xs font-semibold text-slate-700 mb-1">Categoría *</label>
+                  <select id="new-item-category" required class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="Desayunos y Lonches">Desayunos y Lonches</option>
+                    <option value="Comida Fuerte">Comida Fuerte</option>
+                    <option value="Frutas y Snacks">Frutas y Snacks</option>
+                    <option value="Bebidas">Bebidas</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="new-item-price" class="block text-xs font-semibold text-slate-700 mb-1">Precio (MXN) *</label>
+                  <input id="new-item-price" type="number" step="0.5" min="1" required placeholder="30.00" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-3">
+                <div>
+                  <label for="new-item-emoji" class="block text-xs font-semibold text-slate-700 mb-1">Ícono / Emoji</label>
+                  <input id="new-item-emoji" type="text" maxlength="4" value="🌯" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-center text-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+                </div>
+                <div class="col-span-2">
+                  <label for="new-item-desc" class="block text-xs font-semibold text-slate-700 mb-1">Descripción corta *</label>
+                  <input id="new-item-desc" type="text" required placeholder="Tortilla de harina integral con queso" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+                </div>
+              </div>
+
+              <button type="submit" class="w-full py-3 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm transition shadow-xs">
+                Publicar en el Menú
+              </button>
+            </form>
+          </div>
+
+          <!-- Tarjeta: Cambiar Contraseña de Administrador -->
+          <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+            <div class="flex items-center gap-2">
+              <span class="text-lg">🔐</span>
+              <h3 class="text-base sm:text-lg font-extrabold text-slate-900">
+                Cambiar Contraseña Admin
+              </h3>
+            </div>
+            <form onsubmit="window.handleChangeAdminPassword(event)" class="space-y-3">
+              <div>
+                <label for="current-admin-pass" class="block text-xs font-semibold text-slate-700 mb-1">Contraseña actual *</label>
+                <input id="current-admin-pass" type="password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              </div>
+              <div>
+                <label for="new-admin-pass" class="block text-xs font-semibold text-slate-700 mb-1">Nueva contraseña (mín. 4 caracteres) *</label>
+                <input id="new-admin-pass" type="password" minlength="4" required placeholder="Nueva clave" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              </div>
+              <div>
+                <label for="confirm-admin-pass" class="block text-xs font-semibold text-slate-700 mb-1">Confirmar nueva contraseña *</label>
+                <input id="confirm-admin-pass" type="password" minlength="4" required placeholder="Repetir nueva clave" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              </div>
+              <button type="submit" class="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition">
+                Actualizar Contraseña
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: Lista de Platillos Registrados -->
+        <div class="lg:col-span-7 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base sm:text-lg font-extrabold text-slate-900">
+              Platillos en el Catálogo
+            </h3>
+            <span id="admin-menu-count" class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">0 platillos</span>
+          </div>
+          <div id="admin-menu-list" class="divide-y divide-slate-100">
+            <!-- Renderizado dinámico -->
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- BARRA FLOTANTE INFERIOR PARA MÓVIL (IR AL CARRITO)                    -->
+  <!-- ===================================================================== -->
+  <div
+    id="mobile-cart-bar"
+    class="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 shadow-lg"
+  >
+    <button
+      type="button"
+      onclick="window.scrollToCart()"
+      class="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm flex items-center justify-between shadow-sm"
+    >
+      <span class="flex items-center gap-2">
+        <span>🛒 Ver mi carrito</span>
+        <span id="mobile-bar-count" class="px-2 py-0.5 rounded-full bg-white/20 text-xs">0</span>
+      </span>
+      <span id="mobile-bar-total" class="text-base font-extrabold">$0.00</span>
+    </button>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: ACCESO DE ADMINISTRADOR CON CONTRASEÑA                       -->
+  <!-- ===================================================================== -->
+  <div
+    id="admin-login-modal"
+    class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+  >
+    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-fade-up">
+      <div class="p-6 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-sky-500/20 text-sky-300 flex items-center justify-center text-xl">
+            🔐
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base sm:text-lg">Acceso Administrador</h3>
+            <p class="text-xs text-slate-300">Área exclusiva para personal de cafetería</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onclick="window.closeAdminLoginModal()"
+          class="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition"
+          aria-label="Cerrar ventana"
+        >
+          ✕
+        </button>
+      </div>
+
+      <form onsubmit="window.verifyAdminPassword(event)" class="p-6 space-y-4">
+        <div>
+          <label for="admin-password-input" class="block text-xs font-bold text-slate-700 mb-1.5">
+            Ingresa la contraseña de administrador
+          </label>
+          <div class="relative">
+            <input
+              id="admin-password-input"
+              type="password"
+              required
+              autocomplete="current-password"
+              placeholder="Escribe la contraseña..."
+              class="w-full pl-4 pr-12 py-3 rounded-2xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+            <button
+              type="button"
+              onclick="window.togglePasswordVisibility()"
+              class="absolute inset-y-0 right-3 flex items-center px-1.5 text-slate-400 hover:text-slate-700 text-sm font-semibold"
+              title="Mostrar u ocultar contraseña"
+            >
+              <span id="toggle-pass-eye">👁️</span>
+            </button>
+          </div>
+          <p id="admin-login-error" class="hidden mt-2 text-xs font-semibold text-rose-600 bg-rose-50 px-3 py-2 rounded-xl border border-rose-200">
+            Contraseña incorrecta. Inténtalo nuevamente.
+          </p>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-xs text-slate-600">
+          💡 Contraseña inicial predeterminada: <code class="font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">admin1234</code>
+        </div>
+
+        <div class="flex items-center gap-2.5 pt-1">
+          <button
+            type="button"
+            onclick="window.closeAdminLoginModal()"
+            class="flex-1 py-3 rounded-2xl border border-slate-300 text-slate-700 font-bold text-sm hover:bg-slate-50 transition"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            class="flex-1 py-3 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm shadow-sm transition"
+          >
+            Entrar al Panel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: COMPROBANTE DIGITAL DE PEDIDO CONFIRMADO                     -->
+  <!-- ===================================================================== -->
+  <div
+    id="receipt-modal"
+    class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+  >
+    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-fade-up">
+      <div class="p-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-center space-y-1.5">
+        <div class="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center text-2xl">
+          ✅
+        </div>
+        <h3 class="text-xl font-extrabold">¡Pedido Enviado a Cocina!</h3>
+        <p class="text-xs text-emerald-50">Muestra este folio al recoger tu lonche en el recreo</p>
+      </div>
+
+      <div id="receipt-content" class="p-6 space-y-4">
+        <!-- Renderizado dinámico -->
+      </div>
+
+      <div class="px-6 pb-6 flex flex-col sm:flex-row gap-2.5">
+        <button
+          type="button"
+          onclick="window.copyReceiptToClipboard()"
+          class="flex-1 py-3 px-4 rounded-2xl border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs sm:text-sm transition"
+        >
+          📋 Copiar Folio
+        </button>
+        <button
+          type="button"
+          onclick="window.closeReceiptModal()"
+          class="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm transition"
+        >
+          Listo, Hacer Otro Pedido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3: CONFIRMACIÓN PERSONALIZADA (SIN alert() NI confirm())        -->
+  <!-- ===================================================================== -->
+  <div
+    id="custom-confirm-modal"
+    class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+  >
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4 animate-fade-up">
+      <div class="space-y-1.5">
+        <h3 id="confirm-modal-title" class="text-lg font-extrabold text-slate-900">Confirmar acción</h3>
+        <p id="confirm-modal-message" class="text-sm text-slate-600 leading-relaxed">¿Estás seguro?</p>
+      </div>
+      <div class="flex items-center gap-2.5 pt-2">
+        <button
+          type="button"
+          onclick="window.closeConfirmModal()"
+          class="flex-1 py-2.5 rounded-2xl border border-slate-300 text-slate-700 font-bold text-sm hover:bg-slate-50 transition"
+        >
+          Cancelar
+        </button>
+        <button
+          id="confirm-modal-accept-btn"
+          type="button"
+          class="flex-1 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition"
+        >
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- LÓGICA DE APLICACIÓN Y SINCRONIZACIÓN EN TIEMPO REAL                  -->
+  <!-- ===================================================================== -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, doc, addDoc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Catálogo inicial predeterminado de la cafetería escolar
+    const DEFAULT_MENU_ITEMS = [
+      {
+        id: "item-1",
+        name: "Molletes con Frijoles y Queso",
+        category: "Desayunos y Lonches",
+        price: 32.00,
+        emoji: "🥖",
+        description: "Bolillo artesanal horneado con frijoles refritos y queso gratinado.",
+        available: true
+      },
+      {
+        id: "item-2",
+        name: "Sándwich Club de Jamón y Panela",
+        category: "Desayunos y Lonches",
+        price: 35.00,
+        emoji: "🥪",
+        description: "Pan integral con jamón de pavo, queso panela, lechuga y jitomate.",
+        available: true
+      },
+      {
+        id: "item-3",
+        name: "Quesadillas de Queso Oaxaca (2 pzas)",
+        category: "Desayunos y Lonches",
+        price: 30.00,
+        emoji: "🧀",
+        description: "Tortillas de maíz recién hechas rellenas de queso Oaxaca fundido.",
+        available: true
+      },
+      {
+        id: "item-4",
+        name: "Sincronizadas de Jamón y Queso",
+        category: "Desayunos y Lonches",
+        price: 34.00,
+        emoji: "🌮",
+        description: "Dos tortillas de harina doraditas con jamón de pavo y queso manchego.",
+        available: true
+      },
+      {
+        id: "item-5",
+        name: "Pechuga Asada con Arroz y Verduras",
+        category: "Comida Fuerte",
+        price: 52.00,
+        emoji: "🍗",
+        description: "Filete de pechuga a la plancha acompañado de arroz rojo y ensalada fresca.",
+        available: true
+      },
+      {
+        id: "item-6",
+        name: "Espagueti Rojo con Albóndigas",
+        category: "Comida Fuerte",
+        price: 48.00,
+        emoji: "🍝",
+        description: "Pasta en salsa natural de jitomate con mini albóndigas de res.",
+        available: true
+      },
+      {
+        id: "item-7",
+        name: "Tacos Dorados de Pollo (3 pzas)",
+        category: "Comida Fuerte",
+        price: 45.00,
+        emoji: "🌯",
+        description: "Crujientes flautas de pollo deshebrado con lechuga, crema y queso.",
+        available: true
+      },
+      {
+        id: "item-8",
+        name: "Vaso de Fruta Picada de Temporada",
+        category: "Frutas y Snacks",
+        price: 22.00,
+        emoji: "🍉",
+        description: "Sandía, melón, papaya y manzana fresca con limón y chía.",
+        available: true
+      },
+      {
+        id: "item-9",
+        name: "Jícama y Pepino Rallado",
+        category: "Frutas y Snacks",
+        price: 18.00,
+        emoji: "🥒",
+        description: "Vaso fresco con limón natural y chilito en polvo opcional.",
+        available: true
+      },
+      {
+        id: "item-10",
+        name: "Hot Cakes de Avena con Miel (2 pzas)",
+        category: "Frutas y Snacks",
+        price: 28.00,
+        emoji: "🥞",
+        description: "Esponjosos hot cakes preparados con avena molida y miel de abeja.",
+        available: true
+      },
+      {
+        id: "item-11",
+        name: "Agua Fresca de Jamaica (500 ml)",
+        category: "Bebidas",
+        price: 16.00,
+        emoji: "🌺",
+        description: "Infusión natural de flor de jamaica ligeramente endulzada.",
+        available: true
+      },
+      {
+        id: "item-12",
+        name: "Agua Fresca de Horchata Natural (500 ml)",
+        category: "Bebidas",
+        price: 16.00,
+        emoji: "🥛",
+        description: "Bebida tradicional de arroz con un toque suave de canela.",
+        available: true
+      }
+    ];
+
+    // Estado central de la aplicación
+    const state = {
+      view: "student",
+      adminUnlocked: false,
+      adminPassword: "admin1234",
+      adminSubtab: "orders",
+      adminOrderFilter: "all",
+      adminOrderSearch: "",
+      selectedCategory: "Todos",
+      searchQuery: "",
+      menuItems: [...DEFAULT_MENU_ITEMS],
+      cart: {}, // { itemId: quantity }
+      orders: [],
+      lastReceiptText: "",
+      db: null,
+      user: null,
+      appId: typeof __app_id !== "undefined" ? __app_id : "cafeteria-escolar-default",
+      cloudEnabled: false,
+      pendingConfirmCallback: null
+    };
+
+    // Formateador de moneda MXN
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat("es-MX", {
+        style: "currency",
+        currency: "MXN"
+      }).format(Number(amount) || 0);
+    }
+
+    // Escapar HTML para evitar inyección de texto en entradas de usuario
+    function escapeHTML(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    // Mostrar notificación flotante (Toast)
+    function showToast(message, type = "success") {
+      const container = document.getElementById("toast-container");
+      const toast = document.createElement("div");
+      const bgClass =
+        type === "error"
+          ? "bg-rose-600 text-white"
+          : type === "info"
+          ? "bg-sky-600 text-white"
+          : "bg-slate-900 text-white";
+      const icon = type === "error" ? "⚠️" : type === "info" ? "ℹ️" : "✅";
+
+      toast.className = `${bgClass} px-4 py-3 rounded-2xl shadow-lg text-xs sm:text-sm font-semibold flex items-center gap-2.5 pointer-events-auto animate-fade-up`;
+      toast.innerHTML = `<span>${icon}</span><span>${escapeHTML(message)}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transition = "opacity 0.25s ease";
+        setTimeout(() => toast.remove(), 260);
+      }, 3200);
+    }
+
+    // =====================================================================
+    // INICIALIZACIÓN DE FIREBASE (CON FALLBACK SEGURO)
+    // =====================================================================
+    async function initCloudSync() {
+      try {
+        if (typeof __firebase_config === "undefined" || !__firebase_config) {
+          throw new Error("Configuración de nube no presente; ejecutando en modo local.");
+        }
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Regla obligatoria: Autenticar primero antes de cualquier consulta
+        if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        state.db = db;
+        state.user = currentUser;
+        state.cloudEnabled = true;
+
+        const syncPill = document.getElementById("sync-status-pill");
+        if (syncPill) {
+          syncPill.textContent = "● Sincronizado en la nube";
+        }
+
+        await ensureInitialCloudData();
+        attachRealtimeListeners();
+      } catch (err) {
+        console.warn("Modo local activo:", err.message);
+        const syncPill = document.getElementById("sync-status-pill");
+        if (syncPill) {
+          syncPill.textContent = "● Modo local activo";
+          syncPill.className = "px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800";
+        }
+        renderAll();
+      }
+    }
+
+    // Sembrar menú inicial y contraseña si la base de datos está vacía
+    async function ensureInitialCloudData() {
+      if (!state.db || !state.user) return;
+      const menuColRef = collection(state.db, "artifacts", state.appId, "public", "data", "menu_items");
+      const menuSnap = await getDocs(menuColRef);
+
+      if (menuSnap.empty) {
+        for (const item of DEFAULT_MENU_ITEMS) {
+          const itemDoc = doc(state.db, "artifacts", state.appId, "public", "data", "menu_items", item.id);
+          await setDoc(itemDoc, item);
+        }
+      }
+
+      const settingsDocRef = doc(state.db, "artifacts", state.appId, "public", "data", "settings", "admin_config");
+      const settingsSnap = await getDoc(settingsDocRef);
+      if (!settingsSnap.exists()) {
+        await setDoc(settingsDocRef, { password: state.adminPassword });
+      }
+    }
+
+    // Suscribirse en tiempo real a menú, pedidos y contraseña de administrador
+    function attachRealtimeListeners() {
+      if (!state.db || !state.user) return;
+
+      // 1. Escuchar cambios en el menú
+      const menuColRef = collection(state.db, "artifacts", state.appId, "public", "data", "menu_items");
+      onSnapshot(
+        menuColRef,
+        (snapshot) => {
+          const items = [];
+          snapshot.forEach((docSnap) => {
+            items.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          if (items.length > 0) {
+            items.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+            state.menuItems = items;
+          }
+          renderMenuCategories();
+          renderMenuGrid();
+          renderCart();
+          renderAdminMenu();
+        },
+        (error) => {
+          console.error("Error escuchando menú:", error);
+        }
+      );
+
+      // 2. Escuchar pedidos en tiempo real
+      const ordersColRef = collection(state.db, "artifacts", state.appId, "public", "data", "orders");
+      onSnapshot(
+        ordersColRef,
+        (snapshot) => {
+          const ordersList = [];
+          snapshot.forEach((docSnap) => {
+            ordersList.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          // Ordenar en memoria del más reciente al más antiguo
+          ordersList.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+          state.orders = ordersList;
+          updatePendingBadge();
+          renderAdminStats();
+          renderAdminOrders();
+        },
+        (error) => {
+          console.error("Error escuchando pedidos:", error);
+        }
+      );
+
+      // 3. Escuchar configuración de contraseña de administrador
+      const settingsDocRef = doc(state.db, "artifacts", state.appId, "public", "data", "settings", "admin_config");
+      onSnapshot(
+        settingsDocRef,
+        (docSnap) => {
+          if (docSnap.exists() && docSnap.data().password) {
+            state.adminPassword = docSnap.data().password;
+          }
+        },
+        (error) => {
+          console.error("Error escuchando configuración:", error);
+        }
+      );
+    }
+
+    // =====================================================================
+    // NAVEGACIÓN Y SEGURIDAD DE ADMINISTRADOR
+    // =====================================================================
+    window.switchMainView = function (viewName) {
+      if (viewName === "admin" && !state.adminUnlocked) {
+        window.requestAdminAccess();
+        return;
+      }
+
+      state.view = viewName;
+      const studentView = document.getElementById("student-view");
+      const adminView = document.getElementById("admin-view");
+      const mobileBar = document.getElementById("mobile-cart-bar");
+      const studentBtn = document.getElementById("nav-student-btn");
+      const adminBtn = document.getElementById("nav-admin-btn");
+
+      if (viewName === "student") {
+        studentView.classList.remove("hidden");
+        adminView.classList.add("hidden");
+        mobileBar.classList.remove("hidden");
+        studentBtn.className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all bg-white text-emerald-700 shadow-xs flex items-center gap-1.5";
+        adminBtn.className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5 relative";
+      } else {
+        studentView.classList.add("hidden");
+        adminView.classList.remove("hidden");
+        mobileBar.classList.add("hidden");
+        adminBtn.className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all bg-white text-sky-700 shadow-xs flex items-center gap-1.5 relative";
+        studentBtn.className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5";
+        renderAdminStats();
+        renderAdminOrders();
+        renderAdminMenu();
+      }
+    };
+
+    window.requestAdminAccess = function () {
+      if (state.adminUnlocked) {
+        window.switchMainView("admin");
+        return;
+      }
+      const modal = document.getElementById("admin-login-modal");
+      const input = document.getElementById("admin-password-input");
+      const errorMsg = document.getElementById("admin-login-error");
+      input.value = "";
+      input.type = "password";
+      document.getElementById("toggle-pass-eye").textContent = "👁️";
+      errorMsg.classList.add("hidden");
+      modal.classList.remove("hidden");
+      setTimeout(() => input.focus(), 60);
+    };
+
+    window.closeAdminLoginModal = function () {
+      document.getElementById("admin-login-modal").classList.add("hidden");
+    };
+
+    window.togglePasswordVisibility = function () {
+      const input = document.getElementById("admin-password-input");
+      const eye = document.getElementById("toggle-pass-eye");
+      if (input.type === "password") {
+        input.type = "text";
+        eye.textContent = "🙈";
+      } else {
+        input.type = "password";
+        eye.textContent = "👁️";
+      }
+    };
+
+    window.verifyAdminPassword = function (event) {
+      event.preventDefault();
+      const input = document.getElementById("admin-password-input");
+      const errorMsg = document.getElementById("admin-login-error");
+      const entered = input.value.trim();
+
+      if (entered === state.adminPassword) {
+        state.adminUnlocked = true;
+        document.getElementById("admin-lock-icon").textContent = "🔓";
+        window.closeAdminLoginModal();
+        showToast("Acceso concedido al Panel Administrador");
+        window.switchMainView("admin");
+      } else {
+        errorMsg.classList.remove("hidden");
+        input.focus();
+        input.select();
+      }
+    };
+
+    window.logoutAdmin = function () {
+      state.adminUnlocked = false;
+      document.getElementById("admin-lock-icon").textContent = "🔒";
+      showToast("Sesión de administrador bloqueada", "info");
+      window.switchMainView("student");
+    };
+
+    window.handleChangeAdminPassword = async function (event) {
+      event.preventDefault();
+      const currentInput = document.getElementById("current-admin-pass");
+      const newInput = document.getElementById("new-admin-pass");
+      const confirmInput = document.getElementById("confirm-admin-pass");
+
+      if (currentInput.value !== state.adminPassword) {
+        showToast("La contraseña actual no coincide", "error");
+        return;
+      }
+      if (newInput.value.trim().length < 4) {
+        showToast("La nueva contraseña debe tener al menos 4 caracteres", "error");
+        return;
+      }
+      if (newInput.value !== confirmInput.value) {
+        showToast("Las contraseñas nuevas no coinciden", "error");
+        return;
+      }
+
+      const updatedPassword = newInput.value.trim();
+      state.adminPassword = updatedPassword;
+
+      try {
+        if (state.cloudEnabled && state.db && state.user) {
+          const settingsDocRef = doc(state.db, "artifacts", state.appId, "public", "data", "settings", "admin_config");
+          await setDoc(settingsDocRef, { password: updatedPassword }, { merge: true });
+        }
+        currentInput.value = "";
+        newInput.value = "";
+        confirmInput.value = "";
+        showToast("Contraseña de administrador actualizada correctamente");
+      } catch (err) {
+        console.error("Error guardando contraseña:", err);
+        showToast("No se pudo sincronizar la contraseña en la nube", "error");
+      }
+    };
+
+    // =====================================================================
+    // RENDERIZADO Y LÓGICA DEL MENÚ (VISTA ALUMNOS)
+    // =====================================================================
+    function renderMenuCategories() {
+      const container = document.getElementById("category-pills");
+      const categories = ["Todos", ...new Set(state.menuItems.map((i) => i.category))];
+
+      container.innerHTML = categories
+        .map((cat) => {
+          const active = state.selectedCategory === cat;
+          const classes = active
+            ? "bg-emerald-600 text-white shadow-xs"
+            : "bg-slate-100 text-slate-600 hover:bg-slate-200";
+          return `
+            <button
+              type="button"
+              onclick="window.selectMenuCategory('${escapeHTML(cat)}')"
+              class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${classes}"
+            >
+              ${escapeHTML(cat)}
+            </button>
+          `;
+        })
+        .join("");
+    }
+
+    window.selectMenuCategory = function (category) {
+      state.selectedCategory = category;
+      renderMenuCategories();
+      renderMenuGrid();
+    };
+
+    window.handleMenuSearch = function (val) {
+      state.searchQuery = val.trim().toLowerCase();
+      const clearBtn = document.getElementById("clear-search-btn");
+      if (state.searchQuery) {
+        clearBtn.classList.remove("hidden");
+      } else {
+        clearBtn.classList.add("hidden");
+      }
+      renderMenuGrid();
+    };
+
+    window.clearMenuSearch = function () {
+      const input = document.getElementById("menu-search-input");
+      input.value = "";
+      window.handleMenuSearch("");
+    };
+
+    function getFilteredMenuItems() {
+      return state.menuItems.filter((item) => {
+        const matchesCat =
+          state.selectedCategory === "Todos" || item.category === state.selectedCategory;
+        const matchesSearch =
+          !state.searchQuery ||
+          item.name.toLowerCase().includes(state.searchQuery) ||
+          (item.description && item.description.toLowerCase().includes(state.searchQuery)) ||
+          item.category.toLowerCase().includes(state.searchQuery);
+        return matchesCat && matchesSearch;
+      });
+    }
+
+    function renderMenuGrid() {
+      const grid = document.getElementById("menu-grid");
+      const items = getFilteredMenuItems();
+
+      if (items.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full bg-white rounded-3xl border border-slate-200 p-10 text-center space-y-2">
+            <div class="text-4xl">🔍</div>
+            <h3 class="font-bold text-slate-800">No encontramos platillos con ese filtro</h3>
+            <p class="text-xs text-slate-500">Prueba con otra palabra o selecciona la categoría "Todos".</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = items
+        .map((item) => {
+          const qty = state.cart[item.id] || 0;
+          const isAvailable = item.available !== false;
+
+          let actionControls = "";
+          if (!isAvailable) {
+            actionControls = `
+              <span class="px-3 py-2 rounded-xl bg-slate-100 text-slate-400 text-xs font-bold">
+                Agotado hoy
+              </span>
+            `;
+          } else if (qty === 0) {
+            actionControls = `
+              <button
+                type="button"
+                onclick="window.updateCartQty('${escapeHTML(item.id)}', 1)"
+                class="px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white font-bold text-xs transition flex items-center gap-1.5 border border-emerald-200 hover:border-emerald-600"
+              >
+                <span>+ Agregar</span>
+              </button>
+            `;
+          } else {
+            actionControls = `
+              <div class="flex items-center gap-2 bg-emerald-600 text-white rounded-xl p-1 shadow-xs">
+                <button
+                  type="button"
+                  onclick="window.updateCartQty('${escapeHTML(item.id)}', -1)"
+                  class="w-7 h-7 rounded-lg hover:bg-emerald-700 font-extrabold text-sm flex items-center justify-center transition"
+                  aria-label="Restar uno"
+                >−</button>
+                <span class="min-w-[20px] text-center text-xs font-extrabold">${qty}</span>
+                <button
+                  type="button"
+                  onclick="window.updateCartQty('${escapeHTML(item.id)}', 1)"
+                  class="w-7 h-7 rounded-lg hover:bg-emerald-700 font-extrabold text-sm flex items-center justify-center transition"
+                  aria-label="Sumar uno"
+                >+</button>
+              </div>
+            `;
+          }
+
+          return `
+            <article class="bg-white rounded-3xl border ${qty > 0 ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200/90"} p-4 sm:p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between gap-4 ${!isAvailable ? "opacity-65" : ""}">
+              <div class="flex items-start gap-3.5">
+                <div class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-3xl shrink-0 select-none">
+                  ${escapeHTML(item.emoji || "🍽️")}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <span class="inline-block text-[11px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-lg mb-1">
+                    ${escapeHTML(item.category)}
+                  </span>
+                  <h4 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">
+                    ${escapeHTML(item.name)}
+                  </h4>
+                  <p class="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                    ${escapeHTML(item.description)}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                <div>
+                  <span class="text-[11px] text-slate-400 block">Precio</span>
+                  <span class="text-base sm:text-lg font-extrabold text-slate-900">${formatCurrency(item.price)}</span>
+                </div>
+                ${actionControls}
+              </div>
+            </article>
+          `;
+        })
+        .join("");
+    }
+
+    // =====================================================================
+    // CARRITO DE COMPRAS Y ENVÍO DE PEDIDO DEL ALUMNO
+    // =====================================================================
+    window.updateCartQty = function (itemId, delta) {
+      const current = state.cart[itemId] || 0;
+      const next = current + delta;
+      if (next <= 0) {
+        delete state.cart[itemId];
+      } else {
+        state.cart[itemId] = next;
+      }
+      renderMenuGrid();
+      renderCart();
+    };
+
+    window.clearCart = function () {
+      state.cart = {};
+      renderMenuGrid();
+      renderCart();
+    };
+
+    window.scrollToCart = function () {
+      const panel = document.getElementById("cart-panel");
+      if (panel) {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+
+    function getCartDetails() {
+      const entries = [];
+      let totalItems = 0;
+      let totalPrice = 0;
+
+      for (const [itemId, qty] of Object.entries(state.cart)) {
+        const item = state.menuItems.find((m) => m.id === itemId);
+        if (item && qty > 0) {
+          const subtotal = item.price * qty;
+          entries.push({
+            id: item.id,
+            name: item.name,
+            emoji: item.emoji || "🍽️",
+            price: item.price,
+            quantity: qty,
+            subtotal
+          });
+          totalItems += qty;
+          totalPrice += subtotal;
+        }
+      }
+      return { entries, totalItems, totalPrice };
+    }
+
+    function renderCart() {
+      const container = document.getElementById("cart-items-container");
+      const subtitle = document.getElementById("cart-subtitle");
+      const totalCountEl = document.getElementById("cart-total-count");
+      const totalAmountEl = document.getElementById("cart-total-amount");
+      const confirmBtnTotal = document.getElementById("confirm-btn-total");
+      const confirmBtn = document.getElementById("confirm-order-btn");
+      const clearBtn = document.getElementById("clear-cart-btn");
+      const mobileCount = document.getElementById("mobile-bar-count");
+      const mobileTotal = document.getElementById("mobile-bar-total");
+
+      const { entries, totalItems, totalPrice } = getCartDetails();
+
+      subtitle.textContent = `${totalItems} ${totalItems === 1 ? "producto seleccionado" : "productos seleccionados"}`;
+      totalCountEl.textContent = String(totalItems);
+      totalAmountEl.textContent = formatCurrency(totalPrice);
+      confirmBtnTotal.textContent = formatCurrency(totalPrice);
+      mobileCount.textContent = String(totalItems);
+      mobileTotal.textContent = formatCurrency(totalPrice);
+
+      if (entries.length === 0) {
+        clearBtn.classList.add("hidden");
+        confirmBtn.disabled = true;
+        container.innerHTML = `
+          <div class="py-8 text-center space-y-1.5 bg-slate-50 rounded-2xl border border-dashed border-slate-200 px-4">
+            <div class="text-2xl">🧺</div>
+            <p class="text-xs font-bold text-slate-700">Tu carrito está vacío</p>
+            <p class="text-[11px] text-slate-500">Elige alimentos del menú para comenzar tu orden.</p>
+          </div>
+        `;
+        return;
+      }
+
+      clearBtn.classList.remove("hidden");
+      confirmBtn.disabled = false;
+
+      container.innerHTML = entries
+        .map(
+          (entry) => `
+          <div class="flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/70">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-bold text-slate-900 truncate">
+                ${escapeHTML(entry.emoji)} ${escapeHTML(entry.name)}
+              </p>
+              <p class="text-[11px] text-slate-500">
+                ${formatCurrency(entry.price)} c/u · <span class="font-bold text-emerald-700">${formatCurrency(entry.subtotal)}</span>
+              </p>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onclick="window.updateCartQty('${escapeHTML(entry.id)}', -1)"
+                class="w-7 h-7 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 font-bold text-xs flex items-center justify-center"
+              >−</button>
+              <span class="w-5 text-center text-xs font-extrabold">${entry.quantity}</span>
+              <button
+                type="button"
+                onclick="window.updateCartQty('${escapeHTML(entry.id)}', 1)"
+                class="w-7 h-7 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 font-bold text-xs flex items-center justify-center"
+              >+</button>
+            </div>
+          </div>
+        `
+        )
+        .join("");
+    }
+
+    window.submitStudentOrder = async function (event) {
+      event.preventDefault();
+      const { entries, totalPrice } = getCartDetails();
+      if (entries.length === 0) {
+        showToast("Agrega al menos un alimento antes de confirmar", "error");
+        return;
+      }
+
+      const studentName = document.getElementById("student-name").value.trim();
+      const studentGrade = document.getElementById("student-grade").value;
+      const studentGroup = document.getElementById("student-group").value;
+      const studentRecess = document.getElementById("student-recess").value;
+      const studentNotes = document.getElementById("student-notes").value.trim();
+
+      if (!studentName || !studentGrade || !studentGroup) {
+        showToast("Por favor completa nombre, grado y grupo", "error");
+        return;
+      }
+
+      const folioNumber = "PED-" + Math.floor(1000 + Math.random() * 9000);
+      const now = new Date();
+      const timeFormatted = now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+
+      const newOrder = {
+        folio: folioNumber,
+        studentName,
+        studentGrade,
+        studentGroup,
+        recessTime: studentRecess,
+        notes: studentNotes,
+        items: entries,
+        total: totalPrice,
+        status: "Pendiente",
+        createdAtText: timeFormatted,
+        createdAtMs: Date.now()
+      };
+
+      const submitBtn = document.getElementById("confirm-order-btn");
+      submitBtn.disabled = true;
+
+      try {
+        if (state.cloudEnabled && state.db && state.user) {
+          const ordersColRef = collection(state.db, "artifacts", state.appId, "public", "data", "orders");
+          await addDoc(ordersColRef, newOrder);
+        } else {
+          state.orders.unshift({ id: "local-" + Date.now(), ...newOrder });
+          updatePendingBadge();
+          renderAdminStats();
+          renderAdminOrders();
+        }
+
+        // Limpiar formulario y carrito
+        state.cart = {};
+        document.getElementById("order-checkout-form").reset();
+        renderMenuGrid();
+        renderCart();
+
+        openReceiptModal(newOrder);
+      } catch (err) {
+        console.error("Error enviando pedido:", err);
+        showToast("Ocurrió un problema al enviar el pedido. Intenta de nuevo.", "error");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    };
+
+    // =====================================================================
+    // MODAL DE COMPROBANTE DIGITAL
+    // =====================================================================
+    function openReceiptModal(order) {
+      const content = document.getElementById("receipt-content");
+      const itemsHtml = order.items
+        .map(
+          (i) => `
+          <div class="flex justify-between text-xs py-1">
+            <span class="text-slate-700 font-medium">${i.quantity}x ${escapeHTML(i.name)}</span>
+            <span class="font-bold text-slate-900">${formatCurrency(i.subtotal)}</span>
+          </div>
+        `
+        )
+        .join("");
+
+      state.lastReceiptText = `Folio: ${order.folio} | Alumno: ${order.studentName} (${order.studentGrade} ${order.studentGroup}) | Total: ${formatCurrency(order.total)}`;
+
+      content.innerHTML = `
+        <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-semibold text-slate-500 uppercase">Folio de Orden</span>
+            <p class="text-xl font-extrabold text-emerald-700 tracking-wide">${escapeHTML(order.folio)}</p>
+          </div>
+          <div class="text-right">
+            <span class="text-[11px] font-semibold text-slate-500 uppercase">Entrega</span>
+            <p class="text-xs font-bold text-slate-800">${escapeHTML(order.recessTime)}</p>
+          </div>
+        </div>
+
+        <div class="space-y-1 text-xs">
+          <p><span class="text-slate-500">Alumno:</span> <strong class="text-slate-900">${escapeHTML(order.studentName)}</strong></p>
+          <p><span class="text-slate-500">Salón:</span> <strong class="text-slate-900">${escapeHTML(order.studentGrade)} — ${escapeHTML(order.studentGroup)}</strong></p>
+          ${order.notes ? `<p class="bg-amber-50 text-amber-900 px-2.5 py-1.5 rounded-xl border border-amber-200 mt-1"><strong>Nota:</strong> ${escapeHTML(order.notes)}</p>` : ""}
+        </div>
+
+        <div class="border-t border-b border-dashed border-slate-200 py-2.5 divide-y divide-slate-100">
+          ${itemsHtml}
+        </div>
+
+        <div class="flex items-center justify-between text-base font-extrabold">
+          <span>Total a pagar en caja</span>
+          <span class="text-emerald-600 text-lg">${formatCurrency(order.total)}</span>
+        </div>
+      `;
+
+      document.getElementById("receipt-modal").classList.remove("hidden");
+    }
+
+    window.closeReceiptModal = function () {
+      document.getElementById("receipt-modal").classList.add("hidden");
+    };
+
+    window.copyReceiptToClipboard = function () {
+      try {
+        const tempInput = document.createElement("textarea");
+        tempInput.value = state.lastReceiptText;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+        showToast("Comprobante copiado al portapapeles");
+      } catch (err) {
+        showToast("No se pudo copiar el texto", "error");
+      }
+    };
+
+    // =====================================================================
+    // PANEL ADMINISTRADOR: ÓRDENES, MÉTRICAS Y MENÚ
+    // =====================================================================
+    function updatePendingBadge() {
+      const pendingCount = state.orders.filter((o) => o.status === "Pendiente").length;
+      const badge = document.getElementById("header-pending-badge");
+      if (pendingCount > 0) {
+        badge.textContent = String(pendingCount);
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    function renderAdminStats() {
+      const pending = state.orders.filter((o) => o.status === "Pendiente").length;
+      const preparing = state.orders.filter((o) => o.status === "Preparando").length;
+      const delivered = state.orders.filter((o) => o.status === "Entregado").length;
+      const revenue = state.orders
+        .filter((o) => o.status !== "Cancelado")
+        .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+      document.getElementById("stat-pending").textContent = String(pending);
+      document.getElementById("stat-preparing").textContent = String(preparing);
+      document.getElementById("stat-delivered").textContent = String(delivered);
+      document.getElementById("stat-revenue").textContent = formatCurrency(revenue);
+    }
+
+    window.switchAdminSubtab = function (subtab) {
+      state.adminSubtab = subtab;
+      const ordersSec = document.getElementById("admin-orders-section");
+      const menuSec = document.getElementById("admin-menu-section");
+      const tabOrders = document.getElementById("admin-subtab-orders");
+      const tabMenu = document.getElementById("admin-subtab-menu");
+
+      if (subtab === "orders") {
+        ordersSec.classList.remove("hidden");
+        menuSec.classList.add("hidden");
+        tabOrders.className = "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition bg-sky-600 text-white shadow-xs";
+        tabMenu.className = "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition text-slate-600 hover:text-slate-900";
+      } else {
+        ordersSec.classList.add("hidden");
+        menuSec.classList.remove("hidden");
+        tabMenu.className = "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition bg-sky-600 text-white shadow-xs";
+        tabOrders.className = "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition text-slate-600 hover:text-slate-900";
+      }
+    };
+
+    window.setAdminOrderFilter = function (status) {
+      state.adminOrderFilter = status;
+      document.querySelectorAll(".admin-filter-btn").forEach((btn) => {
+        if (btn.dataset.status === status) {
+          btn.className = "admin-filter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white shrink-0";
+        } else {
+          btn.className = "admin-filter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0";
+        }
+      });
+      renderAdminOrders();
+    };
+
+    window.handleAdminOrderSearch = function (val) {
+      state.adminOrderSearch = val.trim().toLowerCase();
+      renderAdminOrders();
+    };
+
+    function renderAdminOrders() {
+      const container = document.getElementById("admin-orders-list");
+      const filtered = state.orders.filter((order) => {
+        const matchesStatus =
+          state.adminOrderFilter === "all" || order.status === state.adminOrderFilter;
+        const matchesSearch =
+          !state.adminOrderSearch ||
+          (order.studentName && order.studentName.toLowerCase().includes(state.adminOrderSearch)) ||
+          (order.folio && order.folio.toLowerCase().includes(state.adminOrderSearch)) ||
+          (order.studentGrade && order.studentGrade.toLowerCase().includes(state.adminOrderSearch));
+        return matchesStatus && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-white rounded-3xl border border-slate-200 p-10 text-center space-y-2">
+            <div class="text-4xl">📭</div>
+            <h3 class="font-bold text-slate-800">No hay pedidos en esta vista</h3>
+            <p class="text-xs text-slate-500">Cuando los alumnos confirmen sus órdenes aparecerán aquí automáticamente.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered
+        .map((order) => {
+          const statusStyles = {
+            Pendiente: "bg-amber-100 text-amber-800 border-amber-200",
+            Preparando: "bg-sky-100 text-sky-800 border-sky-200",
+            Entregado: "bg-emerald-100 text-emerald-800 border-emerald-200",
+            Cancelado: "bg-rose-100 text-rose-800 border-rose-200"
+          };
+          const badgeClass = statusStyles[order.status] || statusStyles.Pendiente;
+
+          const itemsListHtml = (order.items || [])
+            .map(
+              (item) => `
+              <li class="flex items-center justify-between text-xs py-1">
+                <span class="text-slate-800 font-medium">
+                  <strong class="text-slate-950">${item.quantity}x</strong> ${escapeHTML(item.name)}
+                </span>
+                <span class="text-slate-600 font-semibold">${formatCurrency(item.subtotal)}</span>
+              </li>
+            `
+            )
+            .join("");
+
+          let actionButtonsHtml = "";
+          if (order.status === "Pendiente") {
+            actionButtonsHtml = `
+              <button
+                type="button"
+                onclick="window.updateOrderStatus('${escapeHTML(order.id)}', 'Preparando')"
+                class="flex-1 py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition"
+              >
+                👨‍🍳 Preparar Orden
+              </button>
+              <button
+                type="button"
+                onclick="window.confirmCancelOrder('${escapeHTML(order.id)}', '${escapeHTML(order.folio)}')"
+                class="py-2.5 px-3 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-xs transition"
+              >
+                Cancelar
+              </button>
+            `;
+          } else if (order.status === "Preparando") {
+            actionButtonsHtml = `
+              <button
+                type="button"
+                onclick="window.updateOrderStatus('${escapeHTML(order.id)}', 'Entregado')"
+                class="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition"
+              >
+                ✅ Marcar como Entregado
+              </button>
+            `;
+          } else if (order.status === "Entregado") {
+            actionButtonsHtml = `
+              <button
+                type="button"
+                onclick="window.updateOrderStatus('${escapeHTML(order.id)}', 'Pendiente')"
+                class="py-2 px-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold text-xs transition"
+              >
+                ↩️ Reabrir
+              </button>
+            `;
+          }
+
+          return `
+            <article class="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between gap-4">
+              <div class="space-y-3">
+                <!-- Cabecera de la Orden -->
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-extrabold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
+                        ${escapeHTML(order.folio)}
+                      </span>
+                      <span class="text-[11px] text-slate-400">
+                        ${escapeHTML(order.createdAtText || "")}
+                      </span>
+                    </div>
+                    <h4 class="text-base font-extrabold text-slate-900 mt-1.5">
+                      👦 ${escapeHTML(order.studentName)}
+                    </h4>
+                    <p class="text-xs font-semibold text-slate-600">
+                      ${escapeHTML(order.studentGrade)} · ${escapeHTML(order.studentGroup)} · <span class="text-teal-700">${escapeHTML(order.recessTime || "")}</span>
+                    </p>
+                  </div>
+
+                  <span class="px-3 py-1 rounded-full text-xs font-extrabold border ${badgeClass} shrink-0">
+                    ${escapeHTML(order.status)}
+                  </span>
+                </div>
+
+                <!-- Platillos Solicitados -->
+                <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200/70">
+                  <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Qué pidió:</p>
+                  <ul class="divide-y divide-slate-200/60">
+                    ${itemsListHtml}
+                  </ul>
+                </div>
+
+                ${
+                  order.notes
+                    ? `<div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-3 py-2 text-xs">
+                        <strong>📝 Nota especial:</strong> ${escapeHTML(order.notes)}
+                      </div>`
+                    : ""
+                }
+              </div>
+
+              <!-- Total y Controles de Estado -->
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <div>
+                  <span class="text-[11px] text-slate-400 block">Total a cobrar</span>
+                  <span class="text-lg font-extrabold text-emerald-700">${formatCurrency(order.total)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  ${actionButtonsHtml}
+                </div>
+              </div>
+            </article>
+          `;
+        })
+        .join("");
+    }
+
+    window.updateOrderStatus = async function (orderId, newStatus) {
+      try {
+        if (state.cloudEnabled && state.db && state.user) {
+          const orderDocRef = doc(state.db, "artifacts", state.appId, "public", "data", "orders", orderId);
+          await updateDoc(orderDocRef, { status: newStatus });
+        } else {
+          const target = state.orders.find((o) => o.id === orderId);
+          if (target) target.status = newStatus;
+          updatePendingBadge();
+          renderAdminStats();
+          renderAdminOrders();
+        }
+        showToast(`Orden actualizada a: ${newStatus}`);
+      } catch (err) {
+        console.error("Error actualizando orden:", err);
+        showToast("No se pudo actualizar el estado", "error");
+      }
+    };
+
+    window.confirmCancelOrder = function (orderId, folio) {
+      openConfirmModal(
+        "Cancelar Pedido",
+        `¿Seguro que deseas marcar la orden ${folio} como cancelada?`,
+        () => window.updateOrderStatus(orderId, "Cancelado")
+      );
+    };
+
+    // =====================================================================
+    // GESTIÓN DEL CATÁLOGO DE MENÚ (ADMIN)
+    // =====================================================================
+    function renderAdminMenu() {
+      const list = document.getElementById("admin-menu-list");
+      const countBadge = document.getElementById("admin-menu-count");
+      countBadge.textContent = `${state.menuItems.length} platillos`;
+
+      list.innerHTML = state.menuItems
+        .map((item) => {
+          const isAvailable = item.available !== false;
+          return `
+            <div class="py-3.5 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="text-2xl shrink-0">${escapeHTML(item.emoji || "🍽️")}</span>
+                <div class="min-w-0">
+                  <p class="text-sm font-bold text-slate-900 truncate ${!isAvailable ? "line-through text-slate-400" : ""}">
+                    ${escapeHTML(item.name)}
+                  </p>
+                  <p class="text-xs text-slate-500">
+                    ${escapeHTML(item.category)} · <strong class="text-slate-800">${formatCurrency(item.price)}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onclick="window.toggleMenuItemAvailability('${escapeHTML(item.id)}', ${!isAvailable})"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                    isAvailable
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                      : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                  }"
+                >
+                  ${isAvailable ? "Disponible" : "Pausado"}
+                </button>
+                <button
+                  type="button"
+                  onclick="window.confirmDeleteMenuItem('${escapeHTML(item.id)}', '${escapeHTML(item.name)}')"
+                  class="p-2 rounded-xl text-rose-500 hover:bg-rose-50 transition text-xs font-bold"
+                  title="Eliminar platillo"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    window.handleAddMenuItem = async function (event) {
+      event.preventDefault();
+      const name = document.getElementById("new-item-name").value.trim();
+      const category = document.getElementById("new-item-category").value;
+      const price = parseFloat(document.getElementById("new-item-price").value);
+      const emoji = document.getElementById("new-item-emoji").value.trim() || "🍽️";
+      const description = document.getElementById("new-item-desc").value.trim();
+
+      if (!name || isNaN(price) || price <= 0) {
+        showToast("Completa correctamente el nombre y el precio", "error");
+        return;
+      }
+
+      const newItem = {
+        name,
+        category,
+        price,
+        emoji,
+        description,
+        available: true
+      };
+
+      try {
+        if (state.cloudEnabled && state.db && state.user) {
+          const menuColRef = collection(state.db, "artifacts", state.appId, "public", "data", "menu_items");
+          await addDoc(menuColRef, newItem);
+        } else {
+          state.menuItems.push({ id: "item-" + Date.now(), ...newItem });
+          renderMenuCategories();
+          renderMenuGrid();
+          renderAdminMenu();
+        }
+        event.target.reset();
+        document.getElementById("new-item-emoji").value = "🌯";
+        showToast("Platillo agregado al menú");
+      } catch (err) {
+        console.error("Error agregando platillo:", err);
+        showToast("No se pudo guardar el platillo", "error");
+      }
+    };
+
+    window.toggleMenuItemAvailability = async function (itemId, nextState) {
+      try {
+        if (state.cloudEnabled && state.db && state.user) {
+          const itemDocRef = doc(state.db, "artifacts", state.appId, "public", "data", "menu_items", itemId);
+          await updateDoc(itemDocRef, { available: nextState });
+        } else {
+          const target = state.menuItems.find((i) => i.id === itemId);
+          if (target) target.available = nextState;
+          renderMenuGrid();
+          renderAdminMenu();
+        }
+        showToast(nextState ? "Platillo habilitado" : "Platillo marcado como agotado");
+      } catch (err) {
+        console.error("Error cambiando disponibilidad:", err);
+      }
+    };
+
+    window.confirmDeleteMenuItem = function (itemId, itemName) {
+      openConfirmModal(
+        "Eliminar Platillo",
+        `¿Seguro que deseas eliminar "${itemName}" del catálogo de la cafetería?`,
+        async () => {
+          try {
+            if (state.cloudEnabled && state.db && state.user) {
+              const itemDocRef = doc(state.db, "artifacts", state.appId, "public", "data", "menu_items", itemId);
+              await deleteDoc(itemDocRef);
+            } else {
+              state.menuItems = state.menuItems.filter((i) => i.id !== itemId);
+              renderMenuCategories();
+              renderMenuGrid();
+              renderAdminMenu();
+            }
+            delete state.cart[itemId];
+            renderCart();
+            showToast("Platillo eliminado del menú");
+          } catch (err) {
+            console.error("Error eliminando platillo:", err);
+          }
+        }
+      );
+    };
+
+    // =====================================================================
+    // MODAL DE CONFIRMACIÓN PERSONALIZADO
+    // =====================================================================
+    function openConfirmModal(title, message, onConfirm) {
+      document.getElementById("confirm-modal-title").textContent = title;
+      document.getElementById("confirm-modal-message").textContent = message;
+      state.pendingConfirmCallback = onConfirm;
+      document.getElementById("custom-confirm-modal").classList.remove("hidden");
+    }
+
+    window.closeConfirmModal = function () {
+      document.getElementById("custom-confirm-modal").classList.add("hidden");
+      state.pendingConfirmCallback = null;
+    };
+
+    document.getElementById("confirm-modal-accept-btn").addEventListener("click", () => {
+      if (typeof state.pendingConfirmCallback === "function") {
+        state.pendingConfirmCallback();
+      }
+      window.closeConfirmModal();
+    });
+
+    // Renderizado inicial completo
+    function renderAll() {
+      renderMenuCategories();
+      renderMenuGrid();
+      renderCart();
+      updatePendingBadge();
+      renderAdminStats();
+      renderAdminOrders();
+      renderAdminMenu();
+    }
+
+    renderAll();
+    initCloudSync();
+  </script>
+</body>
+</html>
